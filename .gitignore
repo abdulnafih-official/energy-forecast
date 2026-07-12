@@ -1,0 +1,20 @@
+# Environment
+.env
+energy-forecast-venv/
+
+# Data files
+data/
+
+# Model artifacts
+models/artifacts/
+models/calibration.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
