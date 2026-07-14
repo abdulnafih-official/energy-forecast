@@ -11,6 +11,7 @@ import pandas as pd
 import streamlit as st
 
 sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 from config import CLEANED_DATA_DIR, FEATURES_DATA_DIR, ARTIFACTS_DIR, CALIBRATION_PATH
 from predict import LAG_HOURS, run_forecast
 
