@@ -25,7 +25,12 @@ df["lag_1h"] = df["demand_mw"].shift(1)
 df["lag_24h"] = df["demand_mw"].shift(24)
 df["lag_168h"] = df["demand_mw"].shift(168)
 
-# Drop rows with NaNs from lag windows (leading edge of the series only)
+# Rolling mean feature (24h trailing average). shift(1) before rolling() so the
+# window covers hours t-24..t-1 only — it never includes the current row's own
+# demand, so no leakage.
+df["rolling_mean_24h"] = df["demand_mw"].shift(1).rolling(24).mean()
+
+# Drop rows with NaNs from lag/rolling windows (leading edge of the series only)
 before = df.shape[0]
 df = df.dropna()
 after = df.shape[0]
