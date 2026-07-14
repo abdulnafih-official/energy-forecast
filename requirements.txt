@@ -6,6 +6,5 @@ lightgbm
 prophet
 scikit-learn
 streamlit
-boto3
 python-dotenv
 joblib
