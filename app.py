@@ -7,14 +7,13 @@ import os
 import datetime as dt
 
 import joblib
-import numpy as np
 import pandas as pd
 import streamlit as st
 
 sys.path.append(os.path.dirname(__file__))
 from config import CLEANED_DATA_DIR, FEATURES_DATA_DIR, ARTIFACTS_DIR, CALIBRATION_PATH
+from predict import LAG_HOURS, run_forecast
 
-LAG_HOURS = [1, 24, 168]
 LONG_HORIZON_WARNING_HOURS = 24  # beyond this, flag that the CI understates compounding error
 
 st.set_page_config(page_title="Energy Demand Forecast", page_icon="⚡", layout="centered")
@@ -49,67 +48,6 @@ def load_history():
 def load_feature_cols():
     features = pd.read_parquet(FEATURES_DATA_DIR / "energy_features.parquet")
     return [c for c in features.columns if c not in ("datetime", "demand_mw")]
-
-
-def build_feature_row(target_dt, history, feature_cols):
-    """Build one row of calendar + lag features for target_dt from history."""
-    row = {
-        "hour": target_dt.hour,
-        "day_of_week": target_dt.dayofweek,
-        "day_of_month": target_dt.day,
-        "month": target_dt.month,
-        "quarter": target_dt.quarter,
-        "year": target_dt.year,
-        "is_weekend": int(target_dt.dayofweek >= 5),
-    }
-    for lag in LAG_HOURS:
-        lag_dt = target_dt - pd.Timedelta(hours=lag)
-        if lag_dt not in history.index:
-            raise ValueError(f"Not enough history to compute lag_{lag}h for {target_dt}")
-        row[f"lag_{lag}h"] = history.loc[lag_dt]
-    return pd.DataFrame([row])[feature_cols]
-
-
-def forecast_tree_model(model, target_dt, history, feature_cols):
-    """Direct prediction if target_dt is historical; recursive step-forward
-    prediction (using this model's own outputs as lag inputs) if target_dt
-    is beyond the last known hour."""
-    last_dt = history.index.max()
-    if target_dt <= last_dt:
-        row = build_feature_row(target_dt, history, feature_cols)
-        return float(model.predict(row)[0])
-
-    working_history = history.copy()
-    current_dt = last_dt + pd.Timedelta(hours=1)
-    while current_dt <= target_dt:
-        row = build_feature_row(current_dt, working_history, feature_cols)
-        pred = float(model.predict(row)[0])
-        working_history.loc[current_dt] = pred
-        current_dt += pd.Timedelta(hours=1)
-    return working_history.loc[target_dt]
-
-
-def forecast_prophet(model, target_dt):
-    future = pd.DataFrame({"ds": [target_dt]})
-    return float(model.predict(future)["yhat"].iloc[0])
-
-
-def run_forecast(model_choice, target_dt, models, calibration, history, feature_cols):
-    """Returns (prediction, margin) for the chosen model."""
-    if model_choice == "Ensemble":
-        preds = []
-        for name, model in models.items():
-            if name == "Prophet":
-                preds.append(forecast_prophet(model, target_dt))
-            else:
-                preds.append(forecast_tree_model(model, target_dt, history, feature_cols))
-        return float(np.mean(preds)), calibration["ensemble"]["margin"]
-    elif model_choice == "Prophet":
-        return forecast_prophet(models["Prophet"], target_dt), calibration["prophet"]["margin"]
-    else:
-        key_map = {"XGBoost": "xgboost", "LightGBM": "lightgbm", "Random Forest": "random_forest"}
-        pred = forecast_tree_model(models[model_choice], target_dt, history, feature_cols)
-        return pred, calibration[key_map[model_choice]]["margin"]
 
 
 models = load_models()
@@ -342,11 +280,14 @@ with st.container(key="main_card"):
         value=dt.date.today(),
         min_value=min_valid_dt.date(),
     )
+    picked_hour = st.selectbox(
+        "Hour", options=list(range(24)), format_func=lambda h: f"{h:02d}:00"
+    )
     model_choice = st.selectbox(
         "Model", options=["XGBoost", "LightGBM", "Random Forest", "Prophet", "Ensemble"]
     )
     if st.button("Get Prediction", key="predict_btn"):
-        target_dt = pd.Timestamp(dt.datetime.combine(picked_date, dt.time(hour=0)))
+        target_dt = pd.Timestamp(dt.datetime.combine(picked_date, dt.time(hour=picked_hour)))
         if target_dt < min_valid_dt:
             st.error(
                 f"Pick a date on or after {min_valid_dt.date()} — earlier dates "
@@ -360,7 +301,7 @@ with st.container(key="main_card"):
             horizon_hours = max(0, (target_dt - last_historical_dt) / pd.Timedelta(hours=1))
             st.session_state.prediction_result = {
                 "model": model_choice,
-                "date": target_dt.date(),
+                "datetime": target_dt,
                 "lower": prediction - margin,
                 "upper": prediction + margin,
                 "horizon_hours": horizon_hours,
@@ -385,7 +326,7 @@ if st.session_state.show_prediction and st.session_state.prediction_result:
             st.rerun()
 
         st.markdown(f"**Model:** {result['model']}")
-        st.markdown(f"**Date:** {result['date']}")
+        st.markdown(f"**Date & hour:** {result['datetime'].strftime('%Y-%m-%d %H:%M')}")
         st.markdown(
             f'<div class="prediction-range">{result["lower"]:.1f} – {result["upper"]:.1f} MW</div>',
             unsafe_allow_html=True,
