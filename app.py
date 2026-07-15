@@ -1,6 +1,3 @@
-
-
-
 import json
 import sys
 import os
@@ -73,187 +70,16 @@ if "prediction_result" not in st.session_state:
 # ---------------------------------------------------------------------------
 # CSS — dark navy / tech / energy theme, glassmorphism, animated background orb
 # ---------------------------------------------------------------------------
-st.markdown(
-    """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+# ---------------------------------------------------------------------------
+# CSS — dark navy / tech / energy theme, glassmorphism, animated background orb
+# ---------------------------------------------------------------------------
+def load_css(path):
+    with open(path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-:root {
-    --bg-primary: #0A1628;
-    --bg-secondary: #0F2040;
-    --accent-start: #1E90FF;
-    --accent-end: #00D4FF;
-    --text-primary: #E8F0FE;
-    --text-secondary: #8AA8D8;
-    --glass-bg: rgba(19, 35, 71, 0.55);
-    --glass-border: rgba(30, 58, 106, 0.6);
-}
 
-.stApp {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
-}
-
-/* Animated glowing energy orb, fixed behind everything */
-.bg-orb {
-    position: fixed;
-    top: -20%;
-    left: 50%;
-    width: 900px;
-    height: 900px;
-    transform: translateX(-50%);
-    background: radial-gradient(circle, rgba(30,144,255,0.25) 0%, rgba(0,212,255,0.08) 40%, transparent 70%);
-    filter: blur(40px);
-    z-index: 0;
-    animation: orbPulse 8s ease-in-out infinite;
-    pointer-events: none;
-}
-@keyframes orbPulse {
-    0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
-    50% { opacity: 1; transform: translateX(-48%) scale(1.08); }
-}
-
-.gradient-text {
-    background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-
-.app-title {
-    font-weight: 800;
-    font-size: 2.1rem;
-    margin-bottom: 0;
-}
-.app-subtitle {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-    margin-top: 0.2rem;
-}
-
-/* Info icon button (circular) */
-.st-key-info_icon button {
-    border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    padding: 0;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    color: var(--text-primary);
-    font-size: 18px;
-    float: right;
-}
-
-/* Main glass card wrapping the form */
-.st-key-main_card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    padding: 2rem;
-    margin-top: 1.5rem;
-}
-
-/* Get Prediction button — gradient, hover scale + glow */
-.st-key-predict_btn button {
-    background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    padding: 0.65rem 1.5rem;
-    font-weight: 600;
-    width: 100%;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.st-key-predict_btn button:hover {
-    transform: scale(1.03);
-    box-shadow: 0 0 22px rgba(30, 144, 255, 0.6);
-}
-
-/* Modal backdrop (invisible full-viewport button — click to close) */
-.st-key-modal_backdrop button,
-.st-key-about_backdrop button {
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background: rgba(5, 12, 24, 0.75) !important;
-    border: none !important;
-    border-radius: 0 !important;
-    z-index: 998 !important;
-}
-
-/* Modal card */
-.st-key-modal_card, .st-key-about_card {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1000;
-    background: var(--glass-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    padding: 2rem;
-    width: min(90vw, 440px);
-    max-height: 80vh;
-    overflow-y: auto;
-    animation: modalFadeIn 0.25s ease;
-}
-@keyframes modalFadeIn {
-    from { opacity: 0; transform: translate(-50%, -48%); }
-    to { opacity: 1; transform: translate(-50%, -50%); }
-}
-
-/* Close "x" buttons inside modals */
-.st-key-close_prediction button, .st-key-close_about button {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid var(--glass-border);
-    color: var(--text-primary);
-    padding: 0;
-    z-index: 1001;
-}
-
-.prediction-range {
-    font-size: 1.8rem;
-    font-weight: 700;
-    background: linear-gradient(90deg, var(--accent-start), var(--accent-end));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin: 0.5rem 0;
-}
-
-.footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 2.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--glass-border);
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
-
-@media (max-width: 600px) {
-    .app-title { font-size: 1.5rem; }
-    .st-key-main_card, .st-key-modal_card, .st-key-about_card { padding: 1.2rem; }
-    .footer { flex-direction: column; gap: 0.4rem; text-align: center; }
-}
-</style>
-<div class="bg-orb"></div>
-""",
-    unsafe_allow_html=True,
-)
+load_css(os.path.join(os.path.dirname(__file__), "static", "style.css"))
+st.markdown('<div class="bg-orb"></div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +204,7 @@ if st.session_state.show_about:
             "assumed margin."
         )
         st.markdown("**Tech stack:** Python, pandas, NumPy, scikit-learn, XGBoost, "
-                     "LightGBM, Prophet, Streamlit")
+                    "LightGBM, Prophet, Streamlit")
 
 
 # ---------------------------------------------------------------------------
