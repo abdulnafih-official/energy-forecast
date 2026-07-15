@@ -105,3 +105,24 @@ def download_all_from_s3(bucket_name):
             "- Confirm IAM user has S3ReadOnly permissions"
         )
         raise
+
+@st.cache_resource
+def load_feature_cols_from_s3(bucket_name):
+    """Download feature column list from S3 and return as a list."""
+    s3 = get_s3_client()
+    try:
+        # Adjust the key to match your bucket structure
+        key = "data/features/energy_features.parquet"   # same as in storage.py
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".parquet") as tmp:
+            s3.download_file(bucket_name, key, tmp.name)
+            df = pd.read_parquet(tmp.name)
+            os.unlink(tmp.name)
+
+        # Exclude datetime and target columns (adjust if needed)
+        exclude = ["datetime", "target"]
+        feature_cols = [col for col in df.columns if col not in exclude]
+        print("✅ Loaded feature columns from S3")
+        return feature_cols
+    except Exception as e:
+        raise RuntimeError(f"Failed to load feature columns from S3: {str(e)}")
