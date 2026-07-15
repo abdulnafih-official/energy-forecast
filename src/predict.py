@@ -7,8 +7,8 @@ LAG_HOURS = [1, 24, 168]
 ROLLING_WINDOW_HOURS = 24
 
 
-def build_feature_row(target_dt, history, feature_cols):
-    """Build one row of calendar + lag + rolling features for target_dt from history."""
+def build_feature_row(target_dt, history_series, feature_cols):
+    """Build one row of calendar + lag + rolling features for target_dt from a history Series."""
     row = {
         "hour": target_dt.hour,
         "day_of_week": target_dt.dayofweek,
@@ -18,41 +18,57 @@ def build_feature_row(target_dt, history, feature_cols):
         "year": target_dt.year,
         "is_weekend": int(target_dt.dayofweek >= 5),
     }
+    
+    # 1. Fetch lags safely from our clean history series
     for lag in LAG_HOURS:
         lag_dt = target_dt - pd.Timedelta(hours=lag)
-        if lag_dt not in history.index:
+        if lag_dt not in history_series.index:
             raise ValueError(f"Not enough history to compute lag_{lag}h for {target_dt}")
-        row[f"lag_{lag}h"] = history.loc[lag_dt]
+        row[f"lag_{lag}h"] = float(history_series.loc[lag_dt])
 
+    # 2. Compute rolling mean safely
     window_start = target_dt - pd.Timedelta(hours=ROLLING_WINDOW_HOURS)
     window_end = target_dt - pd.Timedelta(hours=1)
-    window = history.loc[window_start:window_end]
+    window = history_series.loc[window_start:window_end]
     if len(window) < ROLLING_WINDOW_HOURS:
         raise ValueError(
             f"Not enough history to compute rolling_mean_{ROLLING_WINDOW_HOURS}h for {target_dt}"
         )
-    row[f"rolling_mean_{ROLLING_WINDOW_HOURS}h"] = window.mean()
+    row[f"rolling_mean_{ROLLING_WINDOW_HOURS}h"] = float(window.mean())
 
-    return pd.DataFrame([row])[feature_cols]
+    # 3. Filter out 'demand_mw' from feature_cols to prevent KeyError mismatches
+    clean_features = [col for col in feature_cols if col != "demand_mw"]
+
+    return pd.DataFrame([row])[clean_features]
 
 
 def forecast_tree_model(model, target_dt, history, feature_cols):
     """Direct prediction if target_dt is historical; recursive step-forward
     prediction (using this model's own outputs as lag/rolling inputs) if
     target_dt is beyond the last known hour."""
-    last_dt = history.index.max()
+    
+    # Standardize 'history' to a flat Pandas Series immediately to prevent DataFrame bugs
+    if isinstance(history, pd.DataFrame):
+        history_series = history["demand_mw"].copy()
+    else:
+        history_series = history.copy()
+
+    last_dt = history_series.index.max()
+    
+    # If target is in the past, directly predict using the historical data
     if target_dt <= last_dt:
-        row = build_feature_row(target_dt, history, feature_cols)
+        row = build_feature_row(target_dt, history_series, feature_cols)
         return float(model.predict(row)[0])
 
-    working_history = history.copy()
+    # If target is in the future, predict recursively step-by-step
     current_dt = last_dt + pd.Timedelta(hours=1)
     while current_dt <= target_dt:
-        row = build_feature_row(current_dt, working_history, feature_cols)
+        row = build_feature_row(current_dt, history_series, feature_cols)
         pred = float(model.predict(row)[0])
-        working_history.loc[current_dt] = pred
+        history_series.loc[current_dt] = pred
         current_dt += pd.Timedelta(hours=1)
-    return working_history.loc[target_dt]
+        
+    return float(history_series.loc[target_dt])
 
 
 def forecast_prophet(model, target_dt):
