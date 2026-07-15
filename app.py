@@ -1,51 +1,18 @@
-import json
 import sys
 import os
 import datetime as dt
 
-import joblib
 import pandas as pd
 import streamlit as st
 
 sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
-from config import CLEANED_DATA_DIR, FEATURES_DATA_DIR, ARTIFACTS_DIR, CALIBRATION_PATH
+from storage import load_models, load_calibration, load_history, load_feature_cols
 from predict import LAG_HOURS, run_forecast
 
 LONG_HORIZON_WARNING_HOURS = 24  # beyond this, flag that the CI understates compounding error
 
 st.set_page_config(page_title="Energy Demand Forecast", page_icon="⚡", layout="centered")
-
-
-# ---------------------------------------------------------------------------
-# Real pipeline: load trained models, calibration, and history (unchanged
-# from the working version — only the UI around this is new)
-# ---------------------------------------------------------------------------
-@st.cache_resource
-def load_models():
-    return {
-        "XGBoost": joblib.load(ARTIFACTS_DIR / "xgboost_model.joblib"),
-        "LightGBM": joblib.load(ARTIFACTS_DIR / "lightgbm_model.joblib"),
-        "Random Forest": joblib.load(ARTIFACTS_DIR / "random_forest_model.joblib"),
-        "Prophet": joblib.load(ARTIFACTS_DIR / "prophet_model.joblib"),
-    }
-
-
-@st.cache_data
-def load_calibration():
-    return json.loads(CALIBRATION_PATH.read_text())
-
-
-@st.cache_data
-def load_history():
-    cleaned = pd.read_parquet(CLEANED_DATA_DIR / "energy_cleaned.parquet")
-    return cleaned.set_index("datetime")["demand_mw"].sort_index()
-
-
-@st.cache_data
-def load_feature_cols():
-    features = pd.read_parquet(FEATURES_DATA_DIR / "energy_features.parquet")
-    return [c for c in features.columns if c not in ("datetime", "demand_mw")]
 
 
 models = load_models()

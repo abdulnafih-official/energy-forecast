@@ -8,3 +8,4 @@ scikit-learn
 streamlit
 python-dotenv
 joblib
+boto3
