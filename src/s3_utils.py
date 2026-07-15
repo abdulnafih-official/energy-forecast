@@ -112,7 +112,7 @@ def load_feature_cols_from_s3(bucket_name):
     s3 = get_s3_client()
     try:
         # Adjust the key to match your bucket structure
-        key = "data/features/energy_features.parquet"   # same as in storage.py
+        key = "data/energy_cleaned.parquet"   # same as in storage.py
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".parquet") as tmp:
             s3.download_file(bucket_name, key, tmp.name)
